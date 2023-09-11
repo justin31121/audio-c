@@ -58,7 +58,7 @@ static bool mf_decoder_mf_startup = false;
 MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
   
   unsigned int samples_count = 0;
-  unsigned int samples_cap = 30 * (*sample_rate) * (*channels);
+  unsigned int samples_cap = 5 * (*sample_rate) * (*channels);
   unsigned char *samples = malloc(samples_cap * decoder->sample_size);
   if(!samples) {
     mf_decoder_free(decoder);

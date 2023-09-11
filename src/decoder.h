@@ -70,6 +70,33 @@ struct Decoder{
 };
 
 // Public
+DECODER_DEF bool decoder_slurp(Decoder_Read read,
+			       Decoder_Seek seek,
+			       void *opaque,
+			       Decoder_Fmt fmt,
+			       float volume,
+			       int *channels,
+			       int *sample_rate,
+			       unsigned char **samples,
+			       unsigned int *samples_count);
+
+DECODER_DEF bool decoder_slurp_file(const char *filepath,
+				    Decoder_Fmt fmt,
+				    float volume,
+				    int *channels,
+				    int *sample_rate,
+				    unsigned char **samples,
+				    unsigned int *samples_count);
+
+DECODER_DEF bool decoder_slurp_memory(const char *memory,
+				      size_t memory_len,
+				      Decoder_Fmt fmt,
+				      float volume,
+				      int *channels,
+				      int *sample_rate,
+				      unsigned char **samples,
+				      unsigned int *samples_count);
+
 DECODER_DEF bool decoder_init(Decoder *decoder,
 			      Decoder_Read read,
 			      Decoder_Seek seek,
@@ -85,10 +112,122 @@ DECODER_DEF bool decoder_fmt_to_bits_per_sample(int *bits, Decoder_Fmt fmt);
 DECODER_DEF bool decoder_fmt_to_libav_fmt(enum AVSampleFormat *av_fmt, Decoder_Fmt fmt);
 
 // Protected
+DECODER_DEF int64_t decoder_file_seek(void *opaque, int64_t offset, int whence);
+DECODER_DEF int decoder_file_read(void *opaque, uint8_t *buf, int _buf_size);
+  
 DECODER_DEF int64_t decoder_memory_seek(void *opaque, int64_t offset, int whence);
 DECODER_DEF int decoder_memory_read(void *opaque, uint8_t *buf, int _buf_size);
 
 #ifdef DECODER_IMPLEMENTATION
+
+DECODER_DEF bool decoder_slurp_memory(const char *memory,
+				      size_t memory_len,
+				      Decoder_Fmt fmt,
+				      float volume,
+				      int *channels,
+				      int *sample_rate,
+				      unsigned char **out_samples,
+				      unsigned int *out_samples_count) {
+  Decoder_Memory mem = {
+    .data = memory,
+    .pos = 0,
+    .size = memory_len,
+  };
+
+  return decoder_slurp(decoder_memory_read,
+		       decoder_memory_seek,
+		       &mem,
+		       fmt,
+		       volume,
+		       channels,
+		       sample_rate,
+		       out_samples,
+		       out_samples_count);
+
+}
+
+DECODER_DEF bool decoder_slurp_file(const char *filepath,
+				    Decoder_Fmt fmt,
+				    float volume,
+				    int *channels,
+				    int *sample_rate,
+				    unsigned char **out_samples,
+				    unsigned int *out_samples_count) {
+  FILE *f = fopen(filepath, "rb");
+  if(!f) {
+    return false;
+  }
+  
+  if(!decoder_slurp(decoder_file_read,
+		    decoder_file_seek,
+		    f,
+		    fmt,
+		    volume,
+		    channels,
+		    sample_rate,
+		    out_samples,
+		    out_samples_count)) {
+    fclose(f);
+    return false;
+  }
+
+  fclose(f);
+  return true;
+}
+
+DECODER_DEF bool decoder_slurp(Decoder_Read read,
+			       Decoder_Seek seek,
+			       void *opaque,
+			       Decoder_Fmt fmt,
+			       float volume,
+			       int *channels,
+			       int *sample_rate,
+			       unsigned char **out_samples,
+			       unsigned int *out_samples_count) {
+  Decoder decoder;
+  if(!decoder_init(&decoder, read, seek, opaque,
+		   fmt, 1152, volume, channels, sample_rate)) {
+    return false;
+  }
+
+  unsigned int samples_count = 0;
+  unsigned int samples_cap = 5 * (*sample_rate) * (*channels);
+  unsigned char *samples = malloc(samples_cap * decoder.sample_size);
+  if(!samples) {
+    decoder_free(&decoder);
+    return false;
+  }
+
+  unsigned char decoded_samples[1152 * 4];
+  unsigned int decoded_samples_count;
+  while(decoder_decode(&decoder, &decoded_samples_count, decoded_samples)) {
+
+    unsigned int new_samples_cap = samples_cap;
+    while(samples_count + decoded_samples_count > new_samples_cap) {
+      new_samples_cap *= 2;
+    }
+    if(new_samples_cap != samples_cap) {
+      samples_cap = new_samples_cap;
+      samples = realloc(samples, samples_cap * decoder.sample_size);
+      if(!samples) {
+	decoder_free(&decoder);
+	return false;
+      }
+    }
+    
+    memcpy(samples + samples_count * decoder.sample_size,
+	   decoded_samples,
+	   decoded_samples_count * decoder.sample_size);
+
+    samples_count += decoded_samples_count;
+  }
+
+  *out_samples = samples;
+  *out_samples_count = samples_count;
+
+  decoder_free(&decoder);  
+  return true;
+}
 
 DECODER_DEF bool decoder_init(Decoder *decoder,
 			      Decoder_Read read,
