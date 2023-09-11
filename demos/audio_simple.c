@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     error("Can not find file: '%s'\n", input);
   }
 
-  if(!decoder_slurp_memory(data, size,
+  if(!decoder_slurp_memory((char *) data, size,
 			   DECODER_FMT_S16, 1.0f,
 			   &channels, &sample_rate,
 			   &samples, &samples_count)) {

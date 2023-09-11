@@ -129,7 +129,7 @@ DECODER_DEF bool decoder_slurp_memory(const char *memory,
 				      unsigned char **out_samples,
 				      unsigned int *out_samples_count) {
   Decoder_Memory mem = {
-    .data = memory,
+    .data = (const unsigned char *) memory,
     .pos = 0,
     .size = memory_len,
   };
@@ -199,7 +199,7 @@ DECODER_DEF bool decoder_slurp(Decoder_Read read,
   }
 
   unsigned char decoded_samples[1152 * 4];
-  unsigned int decoded_samples_count;
+  int decoded_samples_count;
   while(decoder_decode(&decoder, &decoded_samples_count, decoded_samples)) {
 
     unsigned int new_samples_cap = samples_cap;
@@ -219,7 +219,7 @@ DECODER_DEF bool decoder_slurp(Decoder_Read read,
 	   decoded_samples,
 	   decoded_samples_count * decoder.sample_size);
 
-    samples_count += decoded_samples_count;
+    samples_count += (unsigned int) decoded_samples_count;
   }
 
   *out_samples = samples;

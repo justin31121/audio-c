@@ -24,12 +24,11 @@ int main(int argc, char **argv) {
     error("Can not load file: '%s'", input);
   }
     
-  MF_Decoder decoder;
   unsigned char *samples;
   unsigned int samples_count;
   int channels, sample_rate;
 
-  if(!mf_decoder_slurp_memory((const char *) buffer, size,
+  if(!mf_decoder_slurp_memory(buffer, size,
 			      MF_DECODER_FMT_S16,
 			      &channels, &sample_rate,
 			      &samples, &samples_count)) {

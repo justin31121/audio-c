@@ -41,11 +41,11 @@ typedef struct{
 }MF_Decoder;
 
 MF_DECODER_DEF bool mf_decoder_slurp(const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **samples, unsigned int *samples_count);
-MF_DECODER_DEF bool mf_decoder_slurp_memory(const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
-MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
+MF_DECODER_DEF bool mf_decoder_slurp_memory(const unsigned char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
+MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
 
 MF_DECODER_DEF bool mf_decoder_init(MF_Decoder *decoder, const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
-MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
+MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const unsigned char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
 MF_DECODER_DEF bool mf_decoder_init_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
 
 MF_DECODER_DEF bool mf_decoder_decode(MF_Decoder *decoder, unsigned char **samples, unsigned int *out_samples);
@@ -55,7 +55,7 @@ MF_DECODER_DEF void mf_decoder_free(MF_Decoder *decoder);
 
 static bool mf_decoder_mf_startup = false;
 
-MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
+MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
   
   unsigned int samples_count = 0;
   unsigned int samples_cap = 5 * (*sample_rate) * (*channels);
@@ -101,7 +101,7 @@ MF_DECODER_DEF bool mf_decoder_slurp(const char *path, MF_Decoder_Fmt fmt, int *
     return false;
   }
 
-  if(!mf_decoder_slurp_impl(&decoder, fmt, channels, sample_rate, out_samples, out_samples_count)) {
+  if(!mf_decoder_slurp_impl(&decoder, channels, sample_rate, out_samples, out_samples_count)) {
     return false;
   }
 
@@ -109,13 +109,13 @@ MF_DECODER_DEF bool mf_decoder_slurp(const char *path, MF_Decoder_Fmt fmt, int *
   return true;
 }
 
-MF_DECODER_DEF bool mf_decoder_slurp_memory(const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
+MF_DECODER_DEF bool mf_decoder_slurp_memory(const unsigned char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
   MF_Decoder decoder;
   if(!mf_decoder_init_memory(&decoder, memory, memory_len, fmt, channels, sample_rate)) {
     return false;
   }
 
-  if(!mf_decoder_slurp_impl(&decoder, fmt, channels, sample_rate, out_samples, out_samples_count)) {
+  if(!mf_decoder_slurp_impl(&decoder, channels, sample_rate, out_samples, out_samples_count)) {
     return false;
   }
 
@@ -270,7 +270,7 @@ MF_DECODER_DEF bool mf_decoder_init_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt
   return false;
 }
 
-MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate) {
+MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const unsigned char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate) {
 
   if(!mf_decoder_mf_startup) {
     if(MFStartup(MF_VERSION, 0) != S_OK) {
