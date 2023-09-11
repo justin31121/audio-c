@@ -40,16 +40,88 @@ typedef struct{
     int sample_size;
 }MF_Decoder;
 
+MF_DECODER_DEF bool mf_decoder_slurp(const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **samples, unsigned int *samples_count);
+MF_DECODER_DEF bool mf_decoder_slurp_memory(const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
+MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count);
+
 MF_DECODER_DEF bool mf_decoder_init(MF_Decoder *decoder, const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
 MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
 MF_DECODER_DEF bool mf_decoder_init_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate);
 
-MF_DECODER_DEF bool mf_decoder_decode(MF_Decoder *decoder, unsigned char **samples, int *out_samples);
+MF_DECODER_DEF bool mf_decoder_decode(MF_Decoder *decoder, unsigned char **samples, unsigned int *out_samples);
 MF_DECODER_DEF void mf_decoder_free(MF_Decoder *decoder);
 
 #ifdef MF_DECODER_IMPLEMENTATION
 
 static bool mf_decoder_mf_startup = false;
+
+MF_DECODER_DEF bool mf_decoder_slurp_impl(MF_Decoder *decoder, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
+  
+  unsigned int samples_count = 0;
+  unsigned int samples_cap = 30 * (*sample_rate) * (*channels);
+  unsigned char *samples = malloc(samples_cap * decoder->sample_size);
+  if(!samples) {
+    mf_decoder_free(decoder);
+    return false;
+  }
+
+  unsigned char *decoded_samples;
+  unsigned int decoded_samples_count;
+  while(mf_decoder_decode(decoder, &decoded_samples, &decoded_samples_count)) {
+
+    unsigned int new_samples_cap = samples_cap;
+    while(samples_count + decoded_samples_count > new_samples_cap) {
+      new_samples_cap *= 2;
+    }
+    if(new_samples_cap != samples_cap) {
+      samples_cap = new_samples_cap;
+      samples = realloc(samples, samples_cap * decoder->sample_size);
+      if(!samples) {
+	mf_decoder_free(decoder);
+	return false;
+      }
+    }
+    
+    memcpy(samples + samples_count * decoder->sample_size,
+	   decoded_samples,
+	   decoded_samples_count * decoder->sample_size);
+
+    samples_count += decoded_samples_count;
+  }
+
+  *out_samples = samples;
+  *out_samples_count = samples_count;
+
+  return true;
+}
+
+MF_DECODER_DEF bool mf_decoder_slurp(const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
+  MF_Decoder decoder;
+  if(!mf_decoder_init(&decoder, path, fmt, channels, sample_rate)) {
+    return false;
+  }
+
+  if(!mf_decoder_slurp_impl(&decoder, fmt, channels, sample_rate, out_samples, out_samples_count)) {
+    return false;
+  }
+
+  mf_decoder_free(&decoder);
+  return true;
+}
+
+MF_DECODER_DEF bool mf_decoder_slurp_memory(const char *memory, size_t memory_len, MF_Decoder_Fmt fmt, int *channels, int *sample_rate, unsigned char **out_samples, unsigned int *out_samples_count) {
+  MF_Decoder decoder;
+  if(!mf_decoder_init_memory(&decoder, memory, memory_len, fmt, channels, sample_rate)) {
+    return false;
+  }
+
+  if(!mf_decoder_slurp_impl(&decoder, fmt, channels, sample_rate, out_samples, out_samples_count)) {
+    return false;
+  }
+
+  mf_decoder_free(&decoder);
+  return true;
+}
 
 MF_DECODER_DEF bool mf_decoder_init(MF_Decoder *decoder, const char *path, MF_Decoder_Fmt fmt, int *channels, int *sample_rate) {
 
@@ -240,7 +312,7 @@ MF_DECODER_DEF bool mf_decoder_init_memory(MF_Decoder *decoder, const char *memo
   return false;
 }
 
-MF_DECODER_DEF bool mf_decoder_decode(MF_Decoder *decoder, unsigned char **samples, int *out_samples) {
+MF_DECODER_DEF bool mf_decoder_decode(MF_Decoder *decoder, unsigned char **samples, unsigned int *out_samples) {
 
     if(decoder->locked) {
 	if(decoder->media_buffer->lpVtbl->Unlock(decoder->media_buffer) != S_OK) {
