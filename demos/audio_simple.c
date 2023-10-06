@@ -51,8 +51,7 @@ int main(int argc, char **argv) {
   }
 
 #endif
-
-
+ 
   Audio audio;
   if(!audio_init(&audio, AUDIO_FMT_S16, channels, sample_rate)) {
     error("Failed to initialize Audio!");
